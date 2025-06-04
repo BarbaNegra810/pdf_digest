@@ -2,6 +2,12 @@
 
 Este projeto fornece um serviço para conversão de arquivos PDF para Markdown usando a biblioteca Docling.
 
+## Requisitos do Sistema
+
+- Python 3.8 ou superior
+- CUDA Toolkit 11.8 ou superior (para suporte a GPU)
+- GPU NVIDIA compatível com CUDA (opcional, mas recomendado para melhor performance)
+
 ## Instalação
 
 1. Clone este repositório
@@ -22,6 +28,16 @@ Este projeto fornece um serviço para conversão de arquivos PDF para Markdown u
    ```
    pip install -r requirements.txt
    ```
+
+### Suporte a GPU
+
+O serviço automaticamente detecta e utiliza a GPU se disponível. Para garantir o melhor desempenho:
+
+1. Instale o CUDA Toolkit apropriado para sua versão do PyTorch
+2. Certifique-se de que sua GPU é compatível com CUDA
+3. Verifique se os drivers NVIDIA estão atualizados
+
+O serviço irá logar qual dispositivo está sendo usado (GPU ou CPU) durante a inicialização.
 
 ## Estrutura do Projeto
 

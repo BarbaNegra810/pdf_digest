@@ -52,12 +52,21 @@ def convert_pdf() -> Dict[str, Any]:
     """
     Endpoint para converter um arquivo PDF para Markdown.
     Espera receber um JSON com os seguintes campos:
-    - path: caminho do diretório no servidor
+    - path: caminho do arquivo PDF ou diretório
     - filename: nome do arquivo (obrigatório quando path é um diretório)
-    - file: arquivo enviado (opcional se path+filename forem fornecidos)
+    - file: arquivo enviado (opcional se path for fornecido)
     
     Returns:
         Dict[str, Any]: Resultado da conversão ou mensagem de erro.
+        Em caso de sucesso, retorna:
+        {
+            'success': True,
+            'pages': {
+                '1': 'markdown da página 1',
+                '2': 'markdown da página 2',
+                ...
+            }
+        }
     """
     logger.info(f"Nova requisição de conversão recebida: {request.method} {request.path}")
     logger.debug(f"Headers: {dict(request.headers)}")
@@ -83,17 +92,17 @@ def convert_pdf() -> Dict[str, Any]:
         
         # Opção 1: JSON com path e opcionalmente filename
         if request.json:
-            # Se ambos path e filename forem fornecidos, concatene-os
-            if 'path' in request.json and 'filename' in request.json:
+            # Se o path já é um arquivo completo, use-o diretamente
+            if 'path' in request.json and request.json['path'].lower().endswith('.pdf'):
+                file_path = request.json['path']
+                logger.info(f"Usando caminho completo do arquivo: {file_path}")
+            
+            # Se path é um diretório e filename está presente
+            elif 'path' in request.json and 'filename' in request.json:
                 base_path = request.json['path']
                 filename = request.json['filename']
                 file_path = os.path.join(base_path, filename)
-                logger.info(f"Combinando path ({base_path}) e filename ({filename}): {file_path}")
-            
-            # Se apenas path for fornecido e for um arquivo completo
-            elif 'path' in request.json:
-                file_path = request.json['path']
-                logger.info(f"Usando apenas o caminho fornecido: {file_path}")
+                logger.info(f"Combinando diretório ({base_path}) com arquivo ({filename}): {file_path}")
             
             # Verifique se o arquivo existe
             if file_path:
@@ -138,8 +147,8 @@ def convert_pdf() -> Dict[str, Any]:
         
         # Converte o PDF para Markdown
         logger.info(f"Iniciando conversão para Markdown: {file_path}")
-        markdown_content = pdf_service.convert_pdf_to_markdown(file_path)
-        logger.info(f"Conversão concluída. Tamanho do conteúdo Markdown: {len(markdown_content)} caracteres")
+        pages_markdown = pdf_service.convert_pdf_to_markdown(file_path)
+        logger.info(f"Conversão concluída. Total de páginas: {len(pages_markdown)}")
         
         # Limpa o arquivo temporário se foi enviado (não se for um caminho)
         if 'file' in request.files:
@@ -153,7 +162,7 @@ def convert_pdf() -> Dict[str, Any]:
         logger.info("Enviando resposta de sucesso")
         return jsonify({
             'success': True,
-            'markdown': markdown_content
+            'pages': pages_markdown
         })
     
     except ValueError as e:
