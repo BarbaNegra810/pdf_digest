@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  pdf-digest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_ENV: development
+    ports:
+      - "5000:5000"
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - CACHE_ENABLED=true
+      - REDIS_URL=redis://redis:6379
+      - GPU_ENABLED=false
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - pdf-digest-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    networks:
+      - pdf-digest-network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=redis:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - pdf-digest-network
+
+volumes:
+  redis_data:
+
+networks:
+  pdf-digest-network:
+    driver: bridge 

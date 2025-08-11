@@ -2,6 +2,12 @@
 venv/
 env/
 .env/
+.venv/
+
+# Arquivos de configuração sensíveis
+.env
+*.env
+!env.example
 
 # Arquivos Python
 __pycache__/
@@ -25,11 +31,15 @@ wheels/
 .installed.cfg
 *.egg
 
-# Diretório de uploads
+# Diretório de uploads e temporários
 uploads/
+temp/
+tmp/
 
-# Logs
+# Logs e relatórios
+logs/
 *.log
+bandit-report.json
 
 # Diretório de cobertura de teste
 htmlcov/
@@ -41,6 +51,7 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+.pytest_cache/
 
 # Diretórios e arquivos de IDE
 .idea/
@@ -50,4 +61,22 @@ coverage.xml
 
 # Arquivos do sistema
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Dados do Redis (se executado localmente)
+dump.rdb
+appendonly.aof
+
+# MyPy cache
+.mypy_cache/
+
+# Backup files
+*.bak
+*.backup
+
+# OS generated files
+.Trashes 
