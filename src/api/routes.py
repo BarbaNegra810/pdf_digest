@@ -35,13 +35,14 @@ def health_check() -> Dict[str, Any]:
     
     try:
         # Testa componentes críticos
+        device_info = pdf_service.get_device_info()
         checks = {
             'api': True,
             'pdf_service': True,
             'cache': cache_service.test_connection(),
             'disk_space': get_disk_usage() < 90,
             'memory_usage': get_memory_usage() < 85,
-            'gpu_available': pdf_service.get_device_info()['gpu_available']
+            'agno_service': device_info.get('service_available', False)
         }
         
         # Status geral

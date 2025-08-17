@@ -64,7 +64,9 @@ class FileService:
             
             # Verifica se não há path traversal no nome do arquivo
             normalized_path = os.path.normpath(file_path)
-            if '..' in normalized_path or normalized_path.startswith('/'):
+            # Só bloqueia se contém '..' após normalização (path traversal real)
+            # Caminhos absolutos são permitidos
+            if '..' in normalized_path:
                 raise SecurityError("Path traversal detectado no nome do arquivo")
             
             logger.info(f"Arquivo validado com sucesso: {file_path}")
