@@ -128,50 +128,26 @@ def convert_pdf() -> Dict[str, Any]:
         logger.info(f"Iniciando conversão do arquivo: {temp_file_path}")
         conversion_result = pdf_service.convert_pdf_adaptive(temp_file_path)
         
-        # Prepara resposta de sucesso baseada no processador usado
-        if conversion_result.get('processor') == 'agno':
-            # Resposta para processamento com Agno (JSON estruturado)
-            response_data = {
-                'processor': 'agno',
-                'format': 'json',
-                'trades': conversion_result['data']['trades'],
-                'fees': conversion_result['data']['fees'],
-                'file_info': {
-                    'filename': file_info.get('filename', file_info.get('original_filename')),
-                    'size_bytes': file_info['file_size'],
-                    'size_formatted': file_info['file_size_formatted'],
-                    'hash': file_info['file_hash']
-                },
-                'processing_info': {
-                    'total_trades': conversion_result['summary']['total_trades'],
-                    'total_fees': conversion_result['summary']['total_fees'],
-                    'processor_info': conversion_result['summary']['processing_info']
-                }
+        # Prepara resposta de sucesso (sempre Agno)
+        response_data = {
+            'processor': 'agno',
+            'format': 'json',
+            'trades': conversion_result['data']['trades'],
+            'fees': conversion_result['data']['fees'],
+            'file_info': {
+                'filename': file_info.get('filename', file_info.get('original_filename')),
+                'size_bytes': file_info['file_size'],
+                'size_formatted': file_info['file_size_formatted'],
+                'hash': file_info['file_hash']
+            },
+            'processing_info': {
+                'total_trades': conversion_result['summary']['total_trades'],
+                'total_fees': conversion_result['summary']['total_fees'],
+                'processor_info': conversion_result['summary']['processing_info']
             }
-        else:
-            # Resposta para processamento com Docling (Markdown - comportamento original)
-            response_data = {
-                'processor': 'docling',
-                'format': 'markdown',
-                'pages': conversion_result['data'],
-                'file_info': {
-                    'filename': file_info.get('filename', file_info.get('original_filename')),
-                    'size_bytes': file_info['file_size'],
-                    'size_formatted': file_info['file_size_formatted'],
-                    'hash': file_info['file_hash'],
-                    'pages_count': len(conversion_result['data'])
-                },
-                'processing_info': {
-                    'device': str(pdf_service.device),
-                    'cached': False,  # TODO: Implementar detecção de cache
-                    'processor_info': conversion_result['summary']['processing_info']
-                }
-            }
+        }
         
-        if conversion_result.get('processor') == 'agno':
-            logger.info(f"Conversão concluída com sucesso: {conversion_result['summary']['total_trades']} trades, {conversion_result['summary']['total_fees']} fees")
-        else:
-            logger.info(f"Conversão concluída com sucesso: {conversion_result['summary']['total_pages']} páginas")
+        logger.info(f"Conversão concluída com sucesso: {conversion_result['summary']['total_trades']} trades, {conversion_result['summary']['total_fees']} fees")
         return jsonify(create_response(True, response_data))
         
     except ValidationError as e:
@@ -222,157 +198,7 @@ def convert_pdf() -> Dict[str, Any]:
             file_service.cleanup_file(temp_file_path)
 
 
-@api_bp.route('/extract-tables', methods=['POST'])
-@rate_limit_middleware()
-def extract_tables() -> Dict[str, Any]:
-    """
-    Endpoint para extração avançada de tabelas de PDFs.
-    
-    Aceita dois formatos:
-    1. Upload de arquivo via multipart/form-data
-    2. JSON com caminho do arquivo no servidor
-    
-    Query parameters:
-    - format: Formato de export ('json', 'csv', 'excel', 'html') - padrão: 'json'
-    - save_files: Se deve salvar arquivos (true/false) - padrão: false
-    
-    Returns:
-        Dict com tabelas extraídas em formato estruturado
-    """
-    logger.info(f"Nova requisição de extração de tabelas: {request.method} {request.path}")
-    
-    file_info = None
-    temp_file_path = None
-    
-    try:
-        # Obtém parâmetros da query string
-        export_format = request.args.get('format', 'json').lower()
-        save_files = request.args.get('save_files', 'false').lower() == 'true'
-        
-        # Valida formato de export
-        valid_formats = ['json', 'csv', 'excel', 'html']
-        if export_format not in valid_formats:
-            return jsonify(create_response(
-                False,
-                error=f"Formato inválido: {export_format}. Formatos válidos: {', '.join(valid_formats)}",
-                code="INVALID_FORMAT"
-            )), 400
-        
-        # Determina o tipo de requisição e processa o arquivo
-        if request.files and 'file' in request.files:
-            # Opção 1: Upload de arquivo
-            logger.info("Processando upload de arquivo para extração de tabelas")
-            uploaded_file = request.files['file']
-            
-            file_info = file_service.save_uploaded_file(uploaded_file)
-            temp_file_path = file_info['file_path']
-            
-        elif request.json and 'path' in request.json:
-            # Opção 2: Arquivo já existe no servidor
-            logger.info("Processando arquivo existente para extração de tabelas")
-            
-            file_path = request.json['path']
-            
-            # Se path é um diretório e filename está presente
-            if 'filename' in request.json:
-                file_path = os.path.join(file_path, request.json['filename'])
-            
-            file_info = file_service.validate_existing_file(file_path)
-            temp_file_path = file_info['file_path']
-            
-        else:
-            return jsonify(create_response(
-                False,
-                error="Nenhum arquivo fornecido",
-                code="NO_FILE_PROVIDED",
-                details={
-                    'instructions': 'Envie um arquivo PDF no campo "file" ou forneça "path" no JSON'
-                }
-            )), 400
-        
-        # Executa a extração avançada de tabelas
-        logger.info(f"Iniciando extração de tabelas: {temp_file_path} (formato: {export_format})")
-        tables_result = pdf_service.extract_tables_advanced(temp_file_path, export_format)
-        
-        # Salva arquivos se solicitado
-        saved_files = {}
-        if save_files and tables_result['tables']:
-            try:
-                # Cria diretório baseado no nome do arquivo
-                base_name = Path(file_info.get('filename', 'unknown')).stem
-                output_dir = f"tables_output/{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                saved_files = pdf_service.save_tables_to_files(tables_result, output_dir)
-                logger.info(f"Tabelas salvas em arquivos: {output_dir}")
-            except Exception as e:
-                logger.warning(f"Erro ao salvar arquivos: {e}")
-                saved_files = {'error': str(e)}
-        
-        # Prepara resposta de sucesso
-        response_data = {
-            'tables': tables_result['tables'],
-            'metadata': tables_result['metadata'],
-            'file_info': {
-                'filename': file_info.get('filename', file_info.get('original_filename')),
-                'size_bytes': file_info['file_size'],
-                'size_formatted': file_info['file_size_formatted'],
-                'hash': file_info['file_hash']
-            },
-            'export_info': {
-                'format': export_format,
-                'files_saved': save_files,
-                'saved_files': saved_files if save_files else None
-            }
-        }
-        
-        logger.info(f"Extração de tabelas concluída: {len(tables_result['tables'])} tabelas encontradas")
-        return jsonify(create_response(True, response_data))
-        
-    except ValidationError as e:
-        logger.warning(f"Erro de validação: {e}")
-        return jsonify(create_response(
-            False,
-            error=str(e),
-            code="VALIDATION_ERROR"
-        )), 400
-        
-    except SecurityError as e:
-        logger.warning(f"Erro de segurança: {e}")
-        return jsonify(create_response(
-            False,
-            error=str(e),
-            code="SECURITY_ERROR"
-        )), 400
-        
-    except ConversionError as e:
-        logger.error(f"Erro de extração: {e}")
-        return jsonify(create_response(
-            False,
-            error=str(e),
-            code="EXTRACTION_ERROR"
-        )), 422
-        
-    except PDFDigestException as e:
-        logger.error(f"Erro do PDF Digest: {e}")
-        return jsonify(create_response(
-            False,
-            error=e.message,
-            code=e.code,
-            details=e.details
-        )), 500
-        
-    except Exception as e:
-        logger.exception(f"Erro inesperado durante extração de tabelas: {e}")
-        return jsonify(create_response(
-            False,
-            error="Erro inesperado durante extração de tabelas",
-            code="UNEXPECTED_ERROR",
-            details={'error': str(e)}
-        )), 500
-        
-    finally:
-        # Limpa arquivo temporário se foi um upload
-        if temp_file_path and 'uploaded_file' in locals():
-            file_service.cleanup_file(temp_file_path)
+
 
 
 @api_bp.route('/extract-b3-trades', methods=['POST'])
@@ -512,160 +338,7 @@ def extract_b3_trades() -> Dict[str, Any]:
             file_service.cleanup_file(temp_file_path)
 
 
-@api_bp.route('/convert-enhanced', methods=['POST'])
-@rate_limit_middleware()
-def convert_pdf_enhanced() -> Dict[str, Any]:
-    """
-    Endpoint para conversão avançada de PDF com extração de tabelas em separado.
-    
-    Combina a conversão tradicional para Markdown com extração estruturada de tabelas.
-    
-    Query parameters:
-    - include_tables: Se deve incluir extração de tabelas (true/false) - padrão: true
-    - table_format: Formato das tabelas ('json', 'csv', 'excel', 'html') - padrão: 'json'
-    
-    Returns:
-        Dict com markdown e tabelas extraídas
-    """
-    logger.info(f"Nova requisição de conversão avançada: {request.method} {request.path}")
-    
-    file_info = None
-    temp_file_path = None
-    
-    try:
-        # Obtém parâmetros da query string
-        include_tables = request.args.get('include_tables', 'true').lower() == 'true'
-        table_format = request.args.get('table_format', 'json').lower()
-        
-        # Valida formato de tabela
-        valid_formats = ['json', 'csv', 'excel', 'html']
-        if include_tables and table_format not in valid_formats:
-            return jsonify(create_response(
-                False,
-                error=f"Formato de tabela inválido: {table_format}. Formatos válidos: {', '.join(valid_formats)}",
-                code="INVALID_TABLE_FORMAT"
-            )), 400
-        
-        # Determina o tipo de requisição e processa o arquivo
-        if request.files and 'file' in request.files:
-            # Opção 1: Upload de arquivo
-            logger.info("Processando upload de arquivo para conversão avançada")
-            uploaded_file = request.files['file']
-            
-            file_info = file_service.save_uploaded_file(uploaded_file)
-            temp_file_path = file_info['file_path']
-            
-        elif request.json and 'path' in request.json:
-            # Opção 2: Arquivo já existe no servidor
-            logger.info("Processando arquivo existente para conversão avançada")
-            
-            file_path = request.json['path']
-            
-            # Se path é um diretório e filename está presente
-            if 'filename' in request.json:
-                file_path = os.path.join(file_path, request.json['filename'])
-            
-            file_info = file_service.validate_existing_file(file_path)
-            temp_file_path = file_info['file_path']
-            
-        else:
-            return jsonify(create_response(
-                False,
-                error="Nenhum arquivo fornecido",
-                code="NO_FILE_PROVIDED",
-                details={
-                    'instructions': 'Envie um arquivo PDF no campo "file" ou forneça "path" no JSON'
-                }
-            )), 400
-        
-        # Executa conversão tradicional para Markdown
-        logger.info(f"Iniciando conversão avançada: {temp_file_path}")
-        markdown_result = pdf_service.convert_pdf_to_markdown(temp_file_path)
-        
-        # Executa extração de tabelas se solicitado
-        tables_result = None
-        if include_tables:
-            try:
-                logger.info(f"Extraindo tabelas em formato {table_format}")
-                tables_result = pdf_service.extract_tables_advanced(temp_file_path, table_format)
-            except Exception as e:
-                logger.warning(f"Erro na extração de tabelas: {e}")
-                tables_result = {
-                    'tables': [],
-                    'metadata': {'error': str(e), 'total_tables': 0}
-                }
-        
-        # Prepara resposta de sucesso
-        response_data = {
-            'markdown': {
-                'pages': markdown_result,
-                'pages_count': len(markdown_result)
-            },
-            'tables': tables_result if include_tables else None,
-            'file_info': {
-                'filename': file_info.get('filename', file_info.get('original_filename')),
-                'size_bytes': file_info['file_size'],
-                'size_formatted': file_info['file_size_formatted'],
-                'hash': file_info['file_hash']
-            },
-            'processing_info': {
-                'device': str(pdf_service.device),
-                'markdown_extraction': True,
-                'table_extraction': include_tables,
-                'table_format': table_format if include_tables else None
-            }
-        }
-        
-        total_tables = tables_result['metadata']['total_tables'] if tables_result else 0
-        logger.info(f"Conversão avançada concluída: {len(markdown_result)} páginas, {total_tables} tabelas")
-        return jsonify(create_response(True, response_data))
-        
-    except ValidationError as e:
-        logger.warning(f"Erro de validação: {e}")
-        return jsonify(create_response(
-            False,
-            error=str(e),
-            code="VALIDATION_ERROR"
-        )), 400
-        
-    except SecurityError as e:
-        logger.warning(f"Erro de segurança: {e}")
-        return jsonify(create_response(
-            False,
-            error=str(e),
-            code="SECURITY_ERROR"
-        )), 400
-        
-    except ConversionError as e:
-        logger.error(f"Erro de conversão: {e}")
-        return jsonify(create_response(
-            False,
-            error=str(e),
-            code="CONVERSION_ERROR"
-        )), 422
-        
-    except PDFDigestException as e:
-        logger.error(f"Erro do PDF Digest: {e}")
-        return jsonify(create_response(
-            False,
-            error=e.message,
-            code=e.code,
-            details=e.details
-        )), 500
-        
-    except Exception as e:
-        logger.exception(f"Erro inesperado durante conversão avançada: {e}")
-        return jsonify(create_response(
-            False,
-            error="Erro inesperado durante conversão avançada",
-            code="UNEXPECTED_ERROR",
-            details={'error': str(e)}
-        )), 500
-        
-    finally:
-        # Limpa arquivo temporário se foi um upload
-        if temp_file_path and 'uploaded_file' in locals():
-            file_service.cleanup_file(temp_file_path)
+
 
 
 @api_bp.route('/stats', methods=['GET'])
@@ -797,14 +470,14 @@ def get_info() -> Dict[str, Any]:
     """
     info_data = {
         'name': 'PDF Digest API',
-        'version': '1.0.0',
-        'description': 'API para conversão de PDFs em Markdown',
+        'version': '2.0.0',
+        'description': 'API para extração de dados estruturados de PDFs usando Agno',
+        'processor': 'agno',
         'endpoints': {
             '/api/health': 'Verificação de saúde',
-            '/api/convert': 'Conversão adaptativa (Docling/Agno conforme configuração)',
-            '/api/extract-b3-trades': 'Extração de trades e fees de notas B3 (sempre Agno)',
-            '/api/extract-tables': 'Extração avançada de tabelas',
-            '/api/convert-enhanced': 'Conversão avançada com tabelas',
+            '/api/convert': 'Conversão com Agno - extrai trades e fees estruturados',
+            '/api/extract-b3-trades': 'Extração específica de trades e fees de notas B3',
+            '/api/debug-pdf-content': 'Debug do conteúdo extraído do PDF',
             '/api/stats': 'Estatísticas do sistema',
             '/api/cache/clear': 'Limpeza de cache',
             '/api/cleanup': 'Limpeza de arquivos antigos',
@@ -890,7 +563,7 @@ def debug_pdf_content() -> Dict[str, Any]:
         
         # Executa debug da extração com conteúdo bruto
         logger.info(f"Iniciando debug de extração: {temp_file_path}")
-        debug_result = agno_service.debug_extraction_with_raw_content(temp_file_path)
+        debug_result = pdf_service.debug_pdf_content(temp_file_path)
         
         # Prepara resposta de sucesso
         response_data = {

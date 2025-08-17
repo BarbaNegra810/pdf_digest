@@ -318,18 +318,18 @@ class AgnoService:
                 else:
                     prompt = self._create_fallback_extraction_prompt(file_path, full_pdf_content)
             
-            # Executa o agente com o arquivo PDF
-            response = self.agent.run(
-                message=prompt,
-                stream=False
-            )
-            
-            # Processa resposta do agente
-            if hasattr(response, 'content'):
-                content = response.content
-            else:
-                content = str(response)
-            
+                # Executa o agente com o arquivo PDF
+                response = self.agent.run(
+                    message=prompt,
+                    stream=False
+                )
+                
+                # Processa resposta do agente
+                if hasattr(response, 'content'):
+                    content = response.content
+                else:
+                    content = str(response)
+                
                 logger.info(f"===== RESPOSTA COMPLETA DO AGNO (tentativa {attempt + 1}) =====")
                 logger.info(content)
                 logger.info("===== FIM DA RESPOSTA =====")
@@ -558,7 +558,7 @@ class AgnoService:
         """Cria prompt simplificado para segunda tentativa."""
         
         if pdf_content:
-        return f"""
+            return f"""
             CONTEÚDO PDF COMPLETO (4 páginas):
             {pdf_content[:3000]}...
             

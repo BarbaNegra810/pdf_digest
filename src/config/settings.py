@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     device: Optional[str] = None
     
     # Configurações de processamento PDF
-    pdf_processor: str = "docling"  # "docling" ou "agno"
+    pdf_processor: str = "agno"  # Sistema opera exclusivamente com Agno
     
     # Configurações do Agno
     openai_api_key: Optional[str] = None
@@ -79,9 +79,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_pdf_processor(cls, v):
         """Valida o processador de PDF."""
-        valid_processors = ['docling', 'agno']
-        if v.lower() not in valid_processors:
-            raise ValueError(f'PDF processor deve ser um de: {valid_processors}')
+        if v.lower() != 'agno':
+            raise ValueError('PDF processor deve ser "agno" - sistema opera exclusivamente com Agno')
         return v.lower()
     
     model_config = ConfigDict(

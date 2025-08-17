@@ -43,11 +43,15 @@ def create_app() -> Flask:
     def root():
         return {
             'name': 'PDF Digest API',
-            'version': '1.0.0',
+            'version': '2.0.0',
             'status': 'running',
+            'processor': 'agno',
+            'description': 'API para extração de dados estruturados de PDFs usando Agno',
             'endpoints': {
                 'health': '/api/health',
                 'convert': '/api/convert',
+                'extract-b3-trades': '/api/extract-b3-trades',
+                'debug-pdf-content': '/api/debug-pdf-content',
                 'stats': '/api/stats',
                 'info': '/api/info'
             }

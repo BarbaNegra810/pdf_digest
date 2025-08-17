@@ -2,7 +2,7 @@
 # CONFIGURAÇÃO AGNO - ADICIONE AO SEU ARQUIVO .env
 # =======================================================
 
-# Processador PDF (docling ou agno)
+# Processador PDF (sistema opera exclusivamente com Agno)
 PDF_PROCESSOR=agno
 
 # Chave da API OpenAI (OBRIGATÓRIA para o Agno)

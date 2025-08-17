@@ -1,12 +1,9 @@
 # Core dependencies
 Flask>=2.3.0,<3.0.0
 Werkzeug>=2.3.0,<3.0.0
-docling>=2.26.0
 
-# ML/AI dependencies
-torch>=2.6.0
-torchvision>=0.21.0
-torchaudio>=2.6.0
+
+# AI dependencies para Agno
 
 # Configuration and validation
 pydantic>=2.6.0,<3.0.0
