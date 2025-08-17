@@ -1,0 +1,49 @@
+# Template de arquivo .env para deploy no Ubuntu 20.04.1
+# Copie este conteúdo para /home/pdfdigest/pdf-digest/.env na VM
+
+# Configurações do Flask/Ambiente
+DEBUG=false
+FLASK_ENV=production
+FLASK_DEBUG=false
+
+# Configurações do servidor
+HOST=0.0.0.0
+PORT=5000
+
+# Processador de PDF (IMPORTANTE!)
+PDF_PROCESSOR=agno
+
+# OpenAI API (OBRIGATÓRIO para Agno)
+OPENAI_API_KEY=sua_chave_openai_aqui
+
+# Redis para cache
+REDIS_URL=redis://localhost:6379/0
+CACHE_ENABLED=true
+CACHE_TTL=3600
+
+# Configurações de upload
+UPLOAD_FOLDER=/home/pdfdigest/pdf-digest/uploads
+MAX_CONTENT_LENGTH=52428800
+ALLOWED_EXTENSIONS=["pdf"]
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FORMAT="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Hardware
+GPU_ENABLED=false
+DEVICE=cpu
+
+# Segurança
+SECRET_KEY=change-this-secret-key-in-production-123456789
+JWT_SECRET_KEY=change-this-jwt-secret-key-in-production-987654321
+JWT_ACCESS_TOKEN_EXPIRES=3600
+
+# Rate limiting
+RATE_LIMIT_PER_MINUTE=10
+RATE_LIMIT_PER_HOUR=100
+RATE_LIMIT_PER_DAY=1000
+
+# Monitoramento
+METRICS_ENABLED=true
+HEALTH_CHECK_INTERVAL=30

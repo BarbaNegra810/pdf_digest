@@ -4,7 +4,7 @@ Sistema de configuração centralizada para o PDF Digest.
 import os
 from pathlib import Path
 from typing import Optional
-from pydantic import validator
+from pydantic import field_validator, ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 5000
     debug: bool = False
+    
+    # Configurações do Flask (para compatibilidade com deploy)
+    flask_env: str = "production"
+    flask_debug: bool = False
     
     # Configurações de upload
     upload_folder: str = "uploads"
@@ -54,14 +58,16 @@ class Settings(BaseSettings):
     metrics_enabled: bool = True
     health_check_interval: int = 30
     
-    @validator('upload_folder')
+    @field_validator('upload_folder')
+    @classmethod
     def create_upload_folder(cls, v):
         """Cria o diretório de upload se não existir."""
         upload_path = Path(v)
         upload_path.mkdir(parents=True, exist_ok=True)
         return str(upload_path.absolute())
     
-    @validator('log_level')
+    @field_validator('log_level')
+    @classmethod
     def validate_log_level(cls, v):
         """Valida o nível de log."""
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
@@ -69,7 +75,8 @@ class Settings(BaseSettings):
             raise ValueError(f'Log level deve ser um de: {valid_levels}')
         return v.upper()
     
-    @validator('pdf_processor')
+    @field_validator('pdf_processor')
+    @classmethod
     def validate_pdf_processor(cls, v):
         """Valida o processador de PDF."""
         valid_processors = ['docling', 'agno']
@@ -77,10 +84,12 @@ class Settings(BaseSettings):
             raise ValueError(f'PDF processor deve ser um de: {valid_processors}')
         return v.lower()
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = 'utf-8'
-        case_sensitive = False
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding='utf-8',
+        case_sensitive=False,
+        extra="allow"  # Permite campos extras para compatibilidade
+    )
 
 
 # Instância global de configurações
