@@ -124,27 +124,54 @@ def convert_pdf() -> Dict[str, Any]:
                 }
             )), 400
         
-        # Executa a conversão
+        # Executa a conversão usando o método adaptativo
         logger.info(f"Iniciando conversão do arquivo: {temp_file_path}")
-        conversion_result = pdf_service.convert_pdf_to_markdown(temp_file_path)
+        conversion_result = pdf_service.convert_pdf_adaptive(temp_file_path)
         
-        # Prepara resposta de sucesso
-        response_data = {
-            'pages': conversion_result,
-            'file_info': {
-                'filename': file_info.get('filename', file_info.get('original_filename')),
-                'size_bytes': file_info['file_size'],
-                'size_formatted': file_info['file_size_formatted'],
-                'hash': file_info['file_hash'],
-                'pages_count': len(conversion_result)
-            },
-            'processing_info': {
-                'device': str(pdf_service.device),
-                'cached': False  # TODO: Implementar detecção de cache
+        # Prepara resposta de sucesso baseada no processador usado
+        if conversion_result.get('processor') == 'agno':
+            # Resposta para processamento com Agno (JSON estruturado)
+            response_data = {
+                'processor': 'agno',
+                'format': 'json',
+                'trades': conversion_result['data']['trades'],
+                'fees': conversion_result['data']['fees'],
+                'file_info': {
+                    'filename': file_info.get('filename', file_info.get('original_filename')),
+                    'size_bytes': file_info['file_size'],
+                    'size_formatted': file_info['file_size_formatted'],
+                    'hash': file_info['file_hash']
+                },
+                'processing_info': {
+                    'total_trades': conversion_result['summary']['total_trades'],
+                    'total_fees': conversion_result['summary']['total_fees'],
+                    'processor_info': conversion_result['summary']['processing_info']
+                }
             }
-        }
+        else:
+            # Resposta para processamento com Docling (Markdown - comportamento original)
+            response_data = {
+                'processor': 'docling',
+                'format': 'markdown',
+                'pages': conversion_result['data'],
+                'file_info': {
+                    'filename': file_info.get('filename', file_info.get('original_filename')),
+                    'size_bytes': file_info['file_size'],
+                    'size_formatted': file_info['file_size_formatted'],
+                    'hash': file_info['file_hash'],
+                    'pages_count': len(conversion_result['data'])
+                },
+                'processing_info': {
+                    'device': str(pdf_service.device),
+                    'cached': False,  # TODO: Implementar detecção de cache
+                    'processor_info': conversion_result['summary']['processing_info']
+                }
+            }
         
-        logger.info(f"Conversão concluída com sucesso: {len(conversion_result)} páginas")
+        if conversion_result.get('processor') == 'agno':
+            logger.info(f"Conversão concluída com sucesso: {conversion_result['summary']['total_trades']} trades, {conversion_result['summary']['total_fees']} fees")
+        else:
+            logger.info(f"Conversão concluída com sucesso: {conversion_result['summary']['total_pages']} páginas")
         return jsonify(create_response(True, response_data))
         
     except ValidationError as e:
@@ -338,6 +365,143 @@ def extract_tables() -> Dict[str, Any]:
         return jsonify(create_response(
             False,
             error="Erro inesperado durante extração de tabelas",
+            code="UNEXPECTED_ERROR",
+            details={'error': str(e)}
+        )), 500
+        
+    finally:
+        # Limpa arquivo temporário se foi um upload
+        if temp_file_path and 'uploaded_file' in locals():
+            file_service.cleanup_file(temp_file_path)
+
+
+@api_bp.route('/extract-b3-trades', methods=['POST'])
+@rate_limit_middleware()
+def extract_b3_trades() -> Dict[str, Any]:
+    """
+    Endpoint específico para extrair trades e fees de notas de corretagem da B3.
+    
+    Sempre usa o processador Agno para extração estruturada de dados.
+    
+    Aceita dois formatos:
+    1. Upload de arquivo via multipart/form-data
+    2. JSON com caminho do arquivo no servidor
+    
+    Returns:
+        Dict com trades e fees extraídos em formato JSON estruturado
+    """
+    logger.info(f"Nova requisição de extração B3: {request.method} {request.path}")
+    
+    file_info = None
+    temp_file_path = None
+    
+    try:
+        # Determina o tipo de requisição e processa o arquivo
+        if request.files and 'file' in request.files:
+            # Opção 1: Upload de arquivo
+            logger.info("Processando upload de arquivo para extração B3")
+            uploaded_file = request.files['file']
+            
+            file_info = file_service.save_uploaded_file(uploaded_file)
+            temp_file_path = file_info['file_path']
+            
+        elif request.json and 'path' in request.json:
+            # Opção 2: Arquivo já existe no servidor
+            logger.info("Processando arquivo existente para extração B3")
+            
+            file_path = request.json['path']
+            
+            # Se path é um diretório e filename está presente
+            if 'filename' in request.json:
+                file_path = os.path.join(file_path, request.json['filename'])
+            
+            file_info = file_service.validate_existing_file(file_path)
+            temp_file_path = file_info['file_path']
+            
+        else:
+            return jsonify(create_response(
+                False,
+                error="Nenhum arquivo fornecido",
+                code="NO_FILE_PROVIDED",
+                details={
+                    'instructions': 'Envie um arquivo PDF no campo "file" ou forneça "path" no JSON'
+                }
+            )), 400
+        
+        # Força uso do Agno para esta extração
+        from src.services.agno_service import agno_service
+        if agno_service is None:
+            return jsonify(create_response(
+                False,
+                error="Serviço Agno não disponível",
+                code="AGNO_UNAVAILABLE",
+                details={'message': 'Framework Agno não está configurado ou disponível'}
+            )), 503
+        
+        # Executa extração com Agno
+        logger.info(f"Iniciando extração B3 com Agno: {temp_file_path}")
+        extraction_result = agno_service.extract_trades_and_fees(temp_file_path)
+        
+        # Prepara resposta de sucesso
+        response_data = {
+            'trades': extraction_result['trades'],
+            'fees': extraction_result['fees'],
+            'file_info': {
+                'filename': file_info.get('filename', file_info.get('original_filename')),
+                'size_bytes': file_info['file_size'],
+                'size_formatted': file_info['file_size_formatted'],
+                'hash': file_info['file_hash']
+            },
+            'processing_info': {
+                'processor': 'agno',
+                'total_trades': len(extraction_result['trades']),
+                'total_fees': len(extraction_result['fees']),
+                'schema_version': '1.0',
+                'extraction_method': 'b3_structured'
+            }
+        }
+        
+        logger.info(f"Extração B3 concluída: {len(extraction_result['trades'])} trades, {len(extraction_result['fees'])} fees")
+        return jsonify(create_response(True, response_data))
+        
+    except ValidationError as e:
+        logger.warning(f"Erro de validação: {e}")
+        return jsonify(create_response(
+            False,
+            error=str(e),
+            code="VALIDATION_ERROR"
+        )), 400
+        
+    except SecurityError as e:
+        logger.warning(f"Erro de segurança: {e}")
+        return jsonify(create_response(
+            False,
+            error=str(e),
+            code="SECURITY_ERROR"
+        )), 400
+        
+    except ConversionError as e:
+        logger.error(f"Erro de extração: {e}")
+        return jsonify(create_response(
+            False,
+            error=str(e),
+            code="EXTRACTION_ERROR"
+        )), 422
+        
+    except PDFDigestException as e:
+        logger.error(f"Erro do PDF Digest: {e}")
+        return jsonify(create_response(
+            False,
+            error=e.message,
+            code=e.code,
+            details=e.details
+        )), 500
+        
+    except Exception as e:
+        logger.exception(f"Erro inesperado durante extração B3: {e}")
+        return jsonify(create_response(
+            False,
+            error="Erro inesperado durante extração B3",
             code="UNEXPECTED_ERROR",
             details={'error': str(e)}
         )), 500
@@ -637,7 +801,8 @@ def get_info() -> Dict[str, Any]:
         'description': 'API para conversão de PDFs em Markdown',
         'endpoints': {
             '/api/health': 'Verificação de saúde',
-            '/api/convert': 'Conversão de PDF para Markdown',
+            '/api/convert': 'Conversão adaptativa (Docling/Agno conforme configuração)',
+            '/api/extract-b3-trades': 'Extração de trades e fees de notas B3 (sempre Agno)',
             '/api/extract-tables': 'Extração avançada de tabelas',
             '/api/convert-enhanced': 'Conversão avançada com tabelas',
             '/api/stats': 'Estatísticas do sistema',
@@ -656,4 +821,147 @@ def get_info() -> Dict[str, Any]:
         }
     }
     
-    return jsonify(create_response(True, info_data)) 
+    return jsonify(create_response(True, info_data))
+
+
+@api_bp.route('/debug-pdf-content', methods=['POST'])
+@rate_limit_middleware()
+def debug_pdf_content() -> Dict[str, Any]:
+    """
+    Endpoint para debug do conteúdo bruto lido do PDF.
+    
+    Mostra exatamente como o texto está sendo extraído pelo Agno
+    para ajudar a diagnosticar problemas de extração.
+    
+    Aceita dois formatos:
+    1. Upload de arquivo via multipart/form-data
+    2. JSON com caminho do arquivo no servidor
+    
+    Returns:
+        Dict com conteúdo bruto extraído e informações de debug
+    """
+    logger.info(f"Nova requisição de debug PDF: {request.method} {request.path}")
+    
+    file_info = None
+    temp_file_path = None
+    
+    try:
+        # Determina o tipo de requisição e processa o arquivo
+        if request.files and 'file' in request.files:
+            # Opção 1: Upload de arquivo
+            logger.info("Processando upload de arquivo para debug")
+            uploaded_file = request.files['file']
+            
+            file_info = file_service.save_uploaded_file(uploaded_file)
+            temp_file_path = file_info['file_path']
+            
+        elif request.json and 'path' in request.json:
+            # Opção 2: Arquivo já existe no servidor
+            logger.info("Processando arquivo existente para debug")
+            
+            file_path = request.json['path']
+            
+            # Se path é um diretório e filename está presente
+            if 'filename' in request.json:
+                file_path = os.path.join(file_path, request.json['filename'])
+            
+            file_info = file_service.validate_existing_file(file_path)
+            temp_file_path = file_info['file_path']
+            
+        else:
+            return jsonify(create_response(
+                False,
+                error="Nenhum arquivo fornecido",
+                code="NO_FILE_PROVIDED",
+                details={
+                    'instructions': 'Envie um arquivo PDF no campo "file" ou forneça "path" no JSON'
+                }
+            )), 400
+        
+        # Força uso do Agno para esta extração de debug
+        from src.services.agno_service import agno_service
+        if agno_service is None:
+            return jsonify(create_response(
+                False,
+                error="Serviço Agno não disponível",
+                code="AGNO_UNAVAILABLE",
+                details={'message': 'Framework Agno não está configurado ou disponível'}
+            )), 503
+        
+        # Executa debug da extração com conteúdo bruto
+        logger.info(f"Iniciando debug de extração: {temp_file_path}")
+        debug_result = agno_service.debug_extraction_with_raw_content(temp_file_path)
+        
+        # Prepara resposta de sucesso
+        response_data = {
+            'file_info': {
+                'filename': file_info.get('filename', file_info.get('original_filename')),
+                'size_bytes': file_info['file_size'],
+                'size_formatted': file_info['file_size_formatted'],
+                'hash': file_info['file_hash']
+            },
+            'raw_content': debug_result['raw_content'],
+            'debug_info': debug_result['debug_info'],
+            'extraction_result': debug_result['extraction_result'],
+            'analysis': {
+                'content_available': any(len(content) > 0 for content in debug_result['raw_content'].values() 
+                                       if isinstance(content, str) and not content.startswith('ERRO')),
+                'extraction_successful': len(debug_result['extraction_result'].get('trades', [])) > 0 or 
+                                       len(debug_result['extraction_result'].get('fees', [])) > 0,
+                'libraries_status': {
+                    'pypdf': debug_result['debug_info']['pypdf_available'],
+                    'pdfminer': debug_result['debug_info']['pdfminer_available'],
+                    'agno': debug_result['debug_info']['agno_available']
+                }
+            }
+        }
+        
+        logger.info(f"Debug de extração concluído para: {temp_file_path}")
+        return jsonify(create_response(True, response_data))
+        
+    except ValidationError as e:
+        logger.warning(f"Erro de validação: {e}")
+        return jsonify(create_response(
+            False,
+            error=str(e),
+            code="VALIDATION_ERROR"
+        )), 400
+        
+    except SecurityError as e:
+        logger.warning(f"Erro de segurança: {e}")
+        return jsonify(create_response(
+            False,
+            error=str(e),
+            code="SECURITY_ERROR"
+        )), 400
+        
+    except ConversionError as e:
+        logger.error(f"Erro de extração: {e}")
+        return jsonify(create_response(
+            False,
+            error=str(e),
+            code="EXTRACTION_ERROR"
+        )), 422
+        
+    except PDFDigestException as e:
+        logger.error(f"Erro do PDF Digest: {e}")
+        return jsonify(create_response(
+            False,
+            error=e.message,
+            code=e.code,
+            details=e.details
+        )), 500
+        
+    except Exception as e:
+        logger.exception(f"Erro inesperado durante debug: {e}")
+        return jsonify(create_response(
+            False,
+            error="Erro inesperado durante debug",
+            code="UNEXPECTED_ERROR",
+            details={'error': str(e)}
+        )), 500
+        
+    finally:
+        # Limpa arquivo temporário se foi um upload
+        if temp_file_path and 'uploaded_file' in locals():
+            file_service.cleanup_file(temp_file_path) 

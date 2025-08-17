@@ -7,7 +7,7 @@ env/
 # Arquivos de configuração sensíveis
 .env
 *.env
-!env.example
+env.example
 
 # Arquivos Python
 __pycache__/

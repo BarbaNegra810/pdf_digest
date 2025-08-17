@@ -1,0 +1,16 @@
+# =======================================================
+# CONFIGURAÇÃO AGNO - ADICIONE AO SEU ARQUIVO .env
+# =======================================================
+
+# Processador PDF (docling ou agno)
+PDF_PROCESSOR=agno
+
+# Chave da API OpenAI (OBRIGATÓRIA para o Agno)
+OPENAI_API_KEY=your-openai-api-key-here
+
+# =======================================================
+# INSTRUÇÕES:
+# 1. Copie as linhas acima para o seu arquivo .env
+# 2. Substitua 'your-openai-api-key-here' pela sua chave real da OpenAI
+# 3. Reinicie a aplicação
+# =======================================================

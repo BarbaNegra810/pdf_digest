@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     gpu_enabled: bool = True
     device: Optional[str] = None
     
+    # Configurações de processamento PDF
+    pdf_processor: str = "docling"  # "docling" ou "agno"
+    
+    # Configurações do Agno
+    openai_api_key: Optional[str] = None
+    
     # Configurações de cache
     cache_enabled: bool = True
     cache_ttl: int = 3600  # 1 hora
@@ -62,6 +68,14 @@ class Settings(BaseSettings):
         if v.upper() not in valid_levels:
             raise ValueError(f'Log level deve ser um de: {valid_levels}')
         return v.upper()
+    
+    @validator('pdf_processor')
+    def validate_pdf_processor(cls, v):
+        """Valida o processador de PDF."""
+        valid_processors = ['docling', 'agno']
+        if v.lower() not in valid_processors:
+            raise ValueError(f'PDF processor deve ser um de: {valid_processors}')
+        return v.lower()
     
     class Config:
         env_file = ".env"

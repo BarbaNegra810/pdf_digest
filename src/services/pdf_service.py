@@ -285,6 +285,97 @@ class PDFService:
             logger.error(f"Erro ao limpar cache: {e}")
             return False
 
+    def convert_pdf_adaptive(self, file_path: str, use_cache: bool = True) -> Dict[str, Any]:
+        """
+        Converte PDF usando o processador configurado (Docling ou Agno).
+        
+        Args:
+            file_path (str): Caminho do arquivo PDF
+            use_cache (bool): Se deve usar cache
+            
+        Returns:
+            Dict com resultado da conversão no formato apropriado
+            
+        Raises:
+            ValidationError: Se o arquivo não for válido
+            ConversionError: Se houver erro na conversão
+        """
+        logger.info(f"Conversão adaptativa iniciada com processador: {settings.pdf_processor}")
+        
+        try:
+            if settings.pdf_processor.lower() == "agno":
+                return self._convert_with_agno(file_path, use_cache)
+            else:
+                return self._convert_with_docling(file_path, use_cache)
+                
+        except Exception as e:
+            logger.error(f"Erro na conversão adaptativa: {e}")
+            raise ConversionError(f"Falha na conversão: {e}")
+
+    def _convert_with_agno(self, file_path: str, use_cache: bool = True) -> Dict[str, Any]:
+        """
+        Converte PDF usando o serviço Agno para extrair trades e fees.
+        
+        Args:
+            file_path (str): Caminho do arquivo PDF
+            use_cache (bool): Se deve usar cache
+            
+        Returns:
+            Dict com trades e fees extraídos
+        """
+        if not AGNO_SERVICE_AVAILABLE or agno_service is None:
+            raise ConversionError("Serviço Agno não disponível")
+        
+        logger.info(f"Convertendo com Agno: {file_path}")
+        
+        # Extrai trades e fees usando Agno
+        agno_result = agno_service.extract_trades_and_fees(file_path, use_cache)
+        
+        # Formata resultado para compatibilidade com a API
+        result = {
+            'processor': 'agno',
+            'format': 'json',
+            'data': agno_result,
+            'summary': {
+                'total_trades': len(agno_result.get('trades', [])),
+                'total_fees': len(agno_result.get('fees', [])),
+                'processing_info': agno_service.get_processing_info()
+            }
+        }
+        
+        logger.info(f"Conversão Agno concluída: {result['summary']['total_trades']} trades")
+        return result
+
+    def _convert_with_docling(self, file_path: str, use_cache: bool = True) -> Dict[str, Any]:
+        """
+        Converte PDF usando o serviço Docling (comportamento original).
+        
+        Args:
+            file_path (str): Caminho do arquivo PDF
+            use_cache (bool): Se deve usar cache
+            
+        Returns:
+            Dict com páginas em markdown
+        """
+        logger.info(f"Convertendo com Docling: {file_path}")
+        
+        # Usa o método original do Docling
+        markdown_pages = self.convert_pdf_to_markdown(file_path, use_cache)
+        
+        # Formata resultado para compatibilidade com a API
+        result = {
+            'processor': 'docling',
+            'format': 'markdown',
+            'data': markdown_pages,
+            'summary': {
+                'total_pages': len(markdown_pages),
+                'processing_info': self.get_device_info()
+            }
+        }
+        
+        logger.info(f"Conversão Docling concluída: {result['summary']['total_pages']} páginas")
+        return result
+
     def extract_tables_advanced(self, file_path: str, export_format: str = "json") -> Dict[str, Any]:
         """
         Extrai tabelas de forma avançada usando as capacidades completas do Docling.
@@ -642,4 +733,13 @@ class PDFService:
 
 
 # Instância global do serviço PDF
-pdf_service = PDFService() 
+pdf_service = PDFService()
+
+# Import do serviço Agno (será usado para alternar entre processadores)
+try:
+    from src.services.agno_service import agno_service
+    AGNO_SERVICE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Serviço Agno não disponível: {e}")
+    agno_service = None
+    AGNO_SERVICE_AVAILABLE = False 
