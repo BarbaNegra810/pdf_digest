@@ -285,6 +285,7 @@ class PDFService:
             logger.error(f"Erro ao limpar cache: {e}")
             return False
 
+<<<<<<< HEAD
     def convert_pdf_adaptive(self, file_path: str, use_cache: bool = True) -> Dict[str, Any]:
         """
         Converte PDF usando o processador configurado (Docling ou Agno).
@@ -376,6 +377,8 @@ class PDFService:
         logger.info(f"Conversão Docling concluída: {result['summary']['total_pages']} páginas")
         return result
 
+=======
+>>>>>>> d47322e2667970c136108a363baaeee69323e063
     def extract_tables_advanced(self, file_path: str, export_format: str = "json") -> Dict[str, Any]:
         """
         Extrai tabelas de forma avançada usando as capacidades completas do Docling.
@@ -733,6 +736,7 @@ class PDFService:
 
 
 # Instância global do serviço PDF
+<<<<<<< HEAD
 pdf_service = PDFService()
 
 # Import do serviço Agno (será usado para alternar entre processadores)
@@ -743,3 +747,6 @@ except ImportError as e:
     logger.warning(f"Serviço Agno não disponível: {e}")
     agno_service = None
     AGNO_SERVICE_AVAILABLE = False 
+=======
+pdf_service = PDFService() 
+>>>>>>> d47322e2667970c136108a363baaeee69323e063

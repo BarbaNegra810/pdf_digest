@@ -28,6 +28,7 @@ python-json-logger>=2.0.0
 
 # PDF processing
 pdfminer.six>=20221105
+<<<<<<< HEAD
 # Agno framework e dependências
 agno
 openai
@@ -40,6 +41,8 @@ exa-py
 newspaper4k
 lxml_html_clean
 sqlalchemy
+=======
+>>>>>>> d47322e2667970c136108a363baaeee69323e063
 
 # Development and testing
 pytest>=7.4.0

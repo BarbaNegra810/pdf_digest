@@ -124,6 +124,7 @@ def convert_pdf() -> Dict[str, Any]:
                 }
             )), 400
         
+<<<<<<< HEAD
         # Executa a conversão usando o método adaptativo
         logger.info(f"Iniciando conversão do arquivo: {temp_file_path}")
         conversion_result = pdf_service.convert_pdf_adaptive(temp_file_path)
@@ -172,6 +173,29 @@ def convert_pdf() -> Dict[str, Any]:
             logger.info(f"Conversão concluída com sucesso: {conversion_result['summary']['total_trades']} trades, {conversion_result['summary']['total_fees']} fees")
         else:
             logger.info(f"Conversão concluída com sucesso: {conversion_result['summary']['total_pages']} páginas")
+=======
+        # Executa a conversão
+        logger.info(f"Iniciando conversão do arquivo: {temp_file_path}")
+        conversion_result = pdf_service.convert_pdf_to_markdown(temp_file_path)
+        
+        # Prepara resposta de sucesso
+        response_data = {
+            'pages': conversion_result,
+            'file_info': {
+                'filename': file_info.get('filename', file_info.get('original_filename')),
+                'size_bytes': file_info['file_size'],
+                'size_formatted': file_info['file_size_formatted'],
+                'hash': file_info['file_hash'],
+                'pages_count': len(conversion_result)
+            },
+            'processing_info': {
+                'device': str(pdf_service.device),
+                'cached': False  # TODO: Implementar detecção de cache
+            }
+        }
+        
+        logger.info(f"Conversão concluída com sucesso: {len(conversion_result)} páginas")
+>>>>>>> d47322e2667970c136108a363baaeee69323e063
         return jsonify(create_response(True, response_data))
         
     except ValidationError as e:
@@ -375,6 +399,7 @@ def extract_tables() -> Dict[str, Any]:
             file_service.cleanup_file(temp_file_path)
 
 
+<<<<<<< HEAD
 @api_bp.route('/extract-b3-trades', methods=['POST'])
 @rate_limit_middleware()
 def extract_b3_trades() -> Dict[str, Any]:
@@ -512,6 +537,8 @@ def extract_b3_trades() -> Dict[str, Any]:
             file_service.cleanup_file(temp_file_path)
 
 
+=======
+>>>>>>> d47322e2667970c136108a363baaeee69323e063
 @api_bp.route('/convert-enhanced', methods=['POST'])
 @rate_limit_middleware()
 def convert_pdf_enhanced() -> Dict[str, Any]:
@@ -801,8 +828,12 @@ def get_info() -> Dict[str, Any]:
         'description': 'API para conversão de PDFs em Markdown',
         'endpoints': {
             '/api/health': 'Verificação de saúde',
+<<<<<<< HEAD
             '/api/convert': 'Conversão adaptativa (Docling/Agno conforme configuração)',
             '/api/extract-b3-trades': 'Extração de trades e fees de notas B3 (sempre Agno)',
+=======
+            '/api/convert': 'Conversão de PDF para Markdown',
+>>>>>>> d47322e2667970c136108a363baaeee69323e063
             '/api/extract-tables': 'Extração avançada de tabelas',
             '/api/convert-enhanced': 'Conversão avançada com tabelas',
             '/api/stats': 'Estatísticas do sistema',
@@ -821,6 +852,7 @@ def get_info() -> Dict[str, Any]:
         }
     }
     
+<<<<<<< HEAD
     return jsonify(create_response(True, info_data))
 
 
@@ -965,3 +997,6 @@ def debug_pdf_content() -> Dict[str, Any]:
         # Limpa arquivo temporário se foi um upload
         if temp_file_path and 'uploaded_file' in locals():
             file_service.cleanup_file(temp_file_path) 
+=======
+    return jsonify(create_response(True, info_data)) 
+>>>>>>> d47322e2667970c136108a363baaeee69323e063

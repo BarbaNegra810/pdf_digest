@@ -7,7 +7,11 @@ env/
 # Arquivos de configuração sensíveis
 .env
 *.env
+<<<<<<< HEAD
 env.example
+=======
+!env.example
+>>>>>>> d47322e2667970c136108a363baaeee69323e063
 
 # Arquivos Python
 __pycache__/
